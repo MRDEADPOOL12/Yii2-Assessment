@@ -149,4 +149,7 @@ N+1 Query Fix:
 
 <img width="812" height="727" alt="tsetrun" src="https://github.com/user-attachments/assets/48575aac-9f77-43d4-a4d9-e28cdb56980d" />
 <img width="836" height="220" alt="converting trials" src="https://github.com/user-attachments/assets/321a54b3-7e4b-45a5-a489-011b1bdc92e6" />
-<img width="1190" height="77" alt="queeu" src="https://github.com/user-attachments/assets/50ea6c31-981c-4f31-bb7b-0ba72d592bfb" />
+<img width="1190" height="7<img width="1097" height="630" alt="email" src="https://github.com/user-attachments/assets/017382bd-b008-4bc0-bf0c-946d0b068ecd" />
+<img width="1097" height="630" alt="email" src="https://github.com/user-attachments/assets/45a41b69-a51b-44d2-9f12-5a482f8cd733" />
+
+
