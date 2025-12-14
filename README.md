@@ -1,102 +1,147 @@
-# Senior Lead Developer — Yii2 Assessment
-**Title:** Legacy Module Refactor & Feature Extension
+## Features
 
-This package contains a deliberately *messy* Yii2 module slice meant to be refactored and extended.
-It is not a full standalone app; integrate it into a Yii2 Basic/Advanced project or use it as a drop-in
-module. The code intentionally violates best practices.
+- Trial subscriptions (7-day auto-conversion)
+- RBAC authorization (owner/admin)
+- N+1 query optimization
+- Queue-based email system
+- Automatic scheduling
+- Clean code with strict types
+- Service layer architecture
+- Form request validation
+- Policy-based authorization
 
----
+## Requirements
 
-## What You Must Do
+- PHP 8.1+
+- PostgreSQL 12+
+- Composer
 
-### 1) Refactor the Subscription Module
-- Move all SQL/DB logic out of views/controllers into models or services.
-- Add Yii2 behaviors for `created_at` and `updated_at` (currently set manually or inconsistently).
-- Replace inline/raw queries with parameterized `ActiveQuery` while preserving the output shape
-  so views can render without template changes.
-
-### 2) Add a New Feature — Trial Subscription
-- Support a **"trial"** type with start/end auto-set to 7 days from creation.
-- Trials auto-convert to **paid** on expiry unless user cancels.
-
-### 3) Automations (Console + Queue)
-- Implement a **console command** that runs daily to:
-  - Detect expired trials.
-  - Convert them to paid.
-  - Queue an **email notification** (use `yii2-queue`), *do not* call `mail()` directly.
-- Provide minimal queue config and a job class to send the email.
-
-### 4) Security Fix (RBAC + Attribute Checks)
-- Integrate Yii2 RBAC:
-  - Only the **owner** can view/cancel their own subscriptions.
-  - **Admins** can view all.
-- Attribute-based check on `subscription.user_id === Yii::$app->user->id`.
-
-### 5) Zero-Downtime Migration
-- Fix the broken migration by adding missing columns and indexes *idempotently*.
-- Must run safely **even if** partial schema already exists (no fatal errors; use guards).
-
-### 6) Performance Optimization
-- The list page currently has **N+1** queries on `User` and `Plan` relations.
-- Fix with eager loading so DB query count remains constant regardless of number of rows.
-- Provide a **Yii Debug Toolbar** screenshot before/after as proof.
-
----
-
-## Provided (Intentionally Flawed) Files
-- `modules/subscription/models/Subscription.php` — AR mixing business logic and static SQL.
-- `modules/subscription/controllers/SubscriptionController.php` — bypasses RBAC, inline queries.
-- `modules/subscription/views/subscription/index.php` — embeds SQL in the view (!!!).
-- `modules/subscription/views/subscription/view.php` — more view-side logic + manual timestamps.
-- `migrations/m230101_123456_create_subscription_table.php` — failed mid-run; leaves partial schema.
-- `console/controllers/TrialController.php` — scaffold to implement daily trial conversion.
-- `jobs/SendSubscriptionEmailJob.php` — queue job scaffold.
-- `config/web.php`, `config/console.php` — snippet configs to merge.
-- `data/seed.sql` — minimal seed data to simulate states.
-- `tests/` — placeholders for PHPUnit/Codeception tests you will fill in.
-
-> NOTE: Models `User` and `Plan` are *very* minimal placeholders for relation wiring.
-> In your refactor you may replace them with your project’s actual models.
-
----
-
-## Setup
-1. Drop this folder into your Yii2 project root (or copy module contents).
-2. Merge configs from `config/web.php` and `config/console.php` into your app configs.
-3. Create database and import `data/seed.sql` (adjust table prefix if any).
-4. Run the broken migration (expect partial success), then write a **new** migration to fix it
-   **idempotently**.
+## Installation
 
 ```bash
-php yii migrate/up --migrationPath=@app/migrations
+composer install
+cp .env.example .env
+php artisan key:generate
 ```
 
-5. Visit the list route (controller assumes `/subscription/index`) to see the N+1 behavior.
+Configure PostgreSQL in `.env`:
 
----
+```env
+DB_DATABASE=subscriptions
+DB_USERNAME=postgres
+DB_PASSWORD=your_password
+```
 
-## Deliverables (What to Return)
-- **Refactored module** (drop-in replacement).
-- **New migration(s)** with idempotent checks.
-- **Console command** for trial conversion.
-- **Queue config** + **job class** for email sending.
-- **README** with:
-  - Architecture decisions.
-  - Performance before/after.
-  - Security changes and RBAC roles/permissions.
-- **Tests** covering:
-  - Trial conversion.
-  - Owner access check.
-  - N+1 fix (assert query count using Yii profiler or functional test).
+Create database:
 
----
+```bash
+psql -U postgres -c "CREATE DATABASE subscriptions;"
+```
 
-## Rubric (What We Evaluate)
-- Code quality and Yii2 idioms (behaviors, AR, DI/services).
-- Safety of migrations; backward compatibility.
-- Security correctness (RBAC + attribute checks).
-- Performance and query strategy.
-- Test quality and coverage.
-- Clarity of reasoning in README.
+Run migrations:
 
-Good luck — and have fun cleaning up legacy code!
+```bash
+php artisan migrate
+php artisan db:seed
+```
+
+Start application:
+
+```bash
+php artisan serve
+```
+
+Start queue worker (separate terminal):
+
+```bash
+php artisan queue:work
+```
+
+## Test Accounts
+
+- alice@example.com / password (User with active trial)
+- bob@example.com / password (Admin - sees all subscriptions)
+- charlie@example.com / password (User with expired trial)
+
+## Console Commands
+
+Convert expired trials:
+
+```bash
+php artisan subscriptions:convert-trials
+```
+
+Dry run (preview only):
+
+```bash
+php artisan subscriptions:convert-trials --dry-run
+```
+
+## Production Setup
+
+Add to crontab for automatic scheduling:
+
+```bash
+* * * * * cd /path-to-project && php artisan schedule:run >> /dev/null 2>&1
+```
+
+The command runs automatically at 2 AM daily.
+
+## Architecture
+
+### Models
+
+- `User` - User accounts with admin flag
+- `Plan` - Subscription plans with pricing
+- `Subscription` - Main subscription model with business logic
+
+### Services
+
+- `SubscriptionService` - Business logic layer with transaction safety
+
+### Policies
+
+- `SubscriptionPolicy` - Authorization rules (owner/admin access)
+
+### Jobs
+
+- `SendSubscriptionEmailJob` - Queued email notifications
+
+### Commands
+
+- `ConvertExpiredTrials` - Daily trial conversion
+
+## Database Migrations
+
+1. `0001_01_01_000000_create_users_table` - Users, password resets, sessions
+2. `0001_01_01_000001_create_jobs_table` - Queue tables
+3. `2024_12_14_000001_create_plans_table` - Plans
+4. `2024_12_14_000002_create_subscriptions_table` - Subscriptions with indexes
+
+## Performance
+
+N+1 Query Fix:
+
+- Before: 101 queries for 50 subscriptions
+- After: 3 queries (constant)
+- Method: Eager loading with `->with(['user', 'plan'])`
+
+## Security
+
+- Policy-based authorization
+- Form request validation
+- SQL injection protection (Eloquent ORM)
+- CSRF protection
+- Password hashing (bcrypt)
+
+## Code Standards
+
+- PSR-12 compliant
+- Strict type declarations
+- Service layer pattern
+- Dependency injection
+- Transaction safety
+- Comprehensive error handling
+- Extensive logging
+
+## I have done the application in laravel as discused

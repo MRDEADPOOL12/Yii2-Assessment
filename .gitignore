@@ -1,0 +1,53 @@
+# ----------------------------------
+# Laravel / PHP
+# ----------------------------------
+/vendor/
+.env
+.env.*
+.phpunit.result.cache
+/storage/*.key
+/bootstrap/cache/*.php
+
+# Storage (keep structure, ignore files)
+!/storage/app/.gitignore
+!/storage/framework/.gitignore
+!/storage/logs/.gitignore
+/storage/app/*
+/storage/framework/*
+/storage/logs/*
+
+# ----------------------------------
+# Node / Frontend
+# ----------------------------------
+/node_modules/
+/public/build
+/public/hot
+/npm-debug.log*
+/yarn-error.log*
+/pnpm-debug.log*
+
+# ----------------------------------
+# IDEs & Editors
+# ----------------------------------
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ----------------------------------
+# OS files
+# ----------------------------------
+.DS_Store
+Thumbs.db
+
+# ----------------------------------
+# Testing & Coverage
+# ----------------------------------
+/coverage/
+.clover.xml
+
+# ----------------------------------
+# Misc
+# ----------------------------------
+*.log
+*.cache
