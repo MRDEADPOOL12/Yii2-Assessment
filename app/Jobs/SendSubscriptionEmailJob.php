@@ -11,6 +11,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 final class SendSubscriptionEmailJob implements ShouldQueue
@@ -40,17 +41,32 @@ final class SendSubscriptionEmailJob implements ShouldQueue
             return;
         }
 
-        Log::info('Subscription email queued', [
-            'user_id' => $this->userId,
-            'subscription_id' => $this->subscriptionId,
-            'email' => $user->email,
-            'subject' => $this->subject,
-        ]);
+        try {
+            Mail::raw($this->body, function ($message) use ($user) {
+                $message->to($user->email, $user->name)
+                    ->subject($this->subject)
+                    ->from(config('mail.from.address'), config('mail.from.name'));
+            });
+
+            Log::info('Subscription email sent successfully', [
+                'user_id' => $this->userId,
+                'subscription_id' => $this->subscriptionId,
+                'email' => $user->email,
+                'subject' => $this->subject,
+            ]);
+        } catch (Throwable $e) {
+            Log::error('Failed to send subscription email', [
+                'user_id' => $this->userId,
+                'subscription_id' => $this->subscriptionId,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
     }
 
     public function failed(?Throwable $exception): void
     {
-        Log::error('Subscription email job failed', [
+        Log::error('Subscription email job failed permanently', [
             'user_id' => $this->userId,
             'subscription_id' => $this->subscriptionId,
             'error' => $exception?->getMessage(),

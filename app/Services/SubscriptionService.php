@@ -6,9 +6,12 @@ namespace App\Services;
 
 use App\Models\Subscription;
 use App\Models\User;
-use App\Jobs\SendSubscriptionEmailJob;
+use App\Mail\SubscriptionCreated;
+use App\Mail\SubscriptionConverted;
+use App\Mail\SubscriptionCancelled;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 final class SubscriptionService
@@ -19,6 +22,10 @@ final class SubscriptionService
             DB::beginTransaction();
             
             $subscription = Subscription::create($data);
+            $subscription->load(['user', 'plan']);
+            
+            // Send welcome email
+            Mail::to($subscription->user)->queue(new SubscriptionCreated($subscription));
             
             Log::info('Subscription created', [
                 'subscription_id' => $subscription->id,
@@ -42,6 +49,10 @@ final class SubscriptionService
             DB::beginTransaction();
             
             $result = $subscription->cancel();
+            $subscription->load(['user', 'plan']);
+            
+            // Send cancellation email
+            Mail::to($subscription->user)->queue(new SubscriptionCancelled($subscription));
             
             Log::info('Subscription cancelled', [
                 'subscription_id' => $subscription->id,
@@ -64,18 +75,10 @@ final class SubscriptionService
             DB::beginTransaction();
             
             $result = $subscription->convertToPaid();
-            
             $subscription->load(['user', 'plan']);
             
-            SendSubscriptionEmailJob::dispatch(
-                $subscription->user_id,
-                $subscription->id,
-                'Trial Converted to Paid',
-                sprintf(
-                    'Your trial for %s plan has been converted to paid subscription.',
-                    $subscription->plan->name
-                )
-            );
+            // Send conversion email using Mailable
+            Mail::to($subscription->user)->queue(new SubscriptionConverted($subscription));
             
             Log::info('Trial converted to paid', [
                 'subscription_id' => $subscription->id,

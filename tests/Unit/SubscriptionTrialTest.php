@@ -8,9 +8,11 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\SubscriptionService;
-use App\Jobs\SendSubscriptionEmailJob;
+use App\Mail\SubscriptionConverted;
+use App\Mail\SubscriptionCreated;
+use App\Mail\SubscriptionCancelled;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 final class SubscriptionTrialTest extends TestCase
@@ -43,6 +45,8 @@ final class SubscriptionTrialTest extends TestCase
 
     public function test_expired_trial_converts_to_paid(): void
     {
+        Mail::fake();
+
         $user = User::factory()->create();
         $plan = Plan::factory()->create();
 
@@ -64,9 +68,9 @@ final class SubscriptionTrialTest extends TestCase
         $this->assertNull($subscription->fresh()->trial_end_at);
     }
 
-    public function test_trial_conversion_queues_email_job(): void
+    public function test_trial_conversion_queues_email(): void
     {
-        Queue::fake();
+        Mail::fake();
 
         $user = User::factory()->create();
         $plan = Plan::factory()->create();
@@ -82,14 +86,56 @@ final class SubscriptionTrialTest extends TestCase
 
         $this->service->convertToPaid($subscription);
 
-        Queue::assertPushed(SendSubscriptionEmailJob::class, function ($job) use ($subscription) {
-            return $job->userId === $subscription->user_id
-                && $job->subscriptionId === $subscription->id;
+        Mail::assertQueued(SubscriptionConverted::class, function ($mail) use ($user) {
+            return $mail->hasTo($user->email);
+        });
+    }
+
+    public function test_subscription_creation_sends_email(): void
+    {
+        Mail::fake();
+
+        $user = User::factory()->create();
+        $plan = Plan::factory()->create();
+
+        $subscription = $this->service->createSubscription([
+            'user_id' => $user->id,
+            'plan_id' => $plan->id,
+            'status' => Subscription::STATUS_ACTIVE,
+            'type' => Subscription::TYPE_TRIAL,
+            'started_at' => now(),
+        ]);
+
+        Mail::assertQueued(SubscriptionCreated::class, function ($mail) use ($user) {
+            return $mail->hasTo($user->email);
+        });
+    }
+
+    public function test_subscription_cancellation_sends_email(): void
+    {
+        Mail::fake();
+
+        $user = User::factory()->create();
+        $plan = Plan::factory()->create();
+
+        $subscription = Subscription::create([
+            'user_id' => $user->id,
+            'plan_id' => $plan->id,
+            'status' => Subscription::STATUS_ACTIVE,
+            'type' => Subscription::TYPE_PAID,
+        ]);
+
+        $this->service->cancelSubscription($subscription);
+
+        Mail::assertQueued(SubscriptionCancelled::class, function ($mail) use ($user) {
+            return $mail->hasTo($user->email);
         });
     }
 
     public function test_convert_expired_trials_command_converts_all_expired(): void
     {
+        Mail::fake();
+
         $user = User::factory()->create();
         $plan = Plan::factory()->create();
 
@@ -119,6 +165,9 @@ final class SubscriptionTrialTest extends TestCase
         $this->assertEquals(0, $result['failed']);
         $this->assertEquals(3, Subscription::where('type', Subscription::TYPE_PAID)->count());
         $this->assertEquals(1, Subscription::where('type', Subscription::TYPE_TRIAL)->count());
+
+        // Verify emails were sent for all conversions
+        Mail::assertQueued(SubscriptionConverted::class, 3);
     }
 
     public function test_cannot_convert_paid_subscription_to_paid(): void
@@ -157,5 +206,30 @@ final class SubscriptionTrialTest extends TestCase
         $this->expectExceptionMessage('Only active subscriptions can be converted');
 
         $subscription->convertToPaid();
+    }
+
+    public function test_email_contains_correct_data(): void
+    {
+        Mail::fake();
+
+        $user = User::factory()->create(['name' => 'John Doe']);
+        $plan = Plan::factory()->create(['name' => 'Premium', 'price' => 29.99]);
+
+        $subscription = Subscription::create([
+            'user_id' => $user->id,
+            'plan_id' => $plan->id,
+            'status' => Subscription::STATUS_ACTIVE,
+            'type' => Subscription::TYPE_TRIAL,
+            'started_at' => now()->subDays(10),
+            'trial_end_at' => now()->subDays(2),
+        ]);
+
+        $this->service->convertToPaid($subscription);
+
+        Mail::assertQueued(SubscriptionConverted::class, function ($mail) use ($subscription) {
+            return $mail->subscription->id === $subscription->id
+                && $mail->subscription->plan->name === 'Premium'
+                && $mail->subscription->user->name === 'John Doe';
+        });
     }
 }

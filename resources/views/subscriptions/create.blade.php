@@ -1,40 +1,52 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Create Subscription</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: system-ui; background: #f5f7fa; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; }
-        h1 { margin-bottom: 20px; }
-        label { display: block; margin: 15px 0 5px; font-weight: 600; }
-        select { width: 100%; padding: 10px; border: 2px solid #e2e8f0; border-radius: 4px; }
-        button { width: 100%; padding: 12px; background: #4299e1; color: white; border: none; border-radius: 4px; margin-top: 20px; cursor: pointer; }
-        .link { display: block; text-align: center; margin-top: 15px; color: #718096; text-decoration: none; }
-        .info { background: #ebf8ff; padding: 15px; margin-bottom: 20px; border-radius: 4px; color: #2c5282; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Subscription - Subscription Management</title>
+    <link rel="stylesheet" href="{{ asset('css/subscriptions.css') }}">
 </head>
 <body>
-    <div class="container">
+    <div class="container" style="max-width: 600px;">
         <h1>Create Subscription</h1>
-        <div class="info"><strong>Info:</strong> Trials auto-expire after 7 days and convert to paid.</div>
+        
+        <div class="info-box">
+            <strong>Info:</strong> Trial subscriptions automatically expire after 7 days and convert to paid subscriptions.
+        </div>
+
+        @if(session('error'))
+            <div class="error">{{ session('error') }}</div>
+        @endif
+        
         <form action="{{ route('subscriptions.store') }}" method="POST">
             @csrf
+            
             <label>Plan</label>
             <select name="plan_id" required>
-                <option value="">Select Plan</option>
+                <option value="">Select a Plan</option>
                 @foreach($plans as $plan)
-                    <option value="{{ $plan->id }}">{{ $plan->name }} - ${{ number_format($plan->price, 2) }}/month</option>
+                    <option value="{{ $plan->id }}" {{ old('plan_id') == $plan->id ? 'selected' : '' }}>
+                        {{ $plan->name }} - ${{ number_format($plan->price, 2) }}/month
+                    </option>
                 @endforeach
             </select>
-            <label>Type</label>
+            @error('plan_id')<div class="error">{{ $message }}</div>@enderror
+            
+            <label>Subscription Type</label>
             <select name="type" required>
-                <option value="trial">Trial (7 days free)</option>
-                <option value="paid">Paid (Immediate billing)</option>
+                <option value="trial" {{ old('type') == 'trial' ? 'selected' : '' }}>Trial (7 days free)</option>
+                <option value="paid" {{ old('type') == 'paid' ? 'selected' : '' }}>Paid (Immediate billing)</option>
             </select>
-            <button>Create Subscription</button>
+            @error('type')<div class="error">{{ $message }}</div>@enderror
+            
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 20px;">
+                Create Subscription
+            </button>
         </form>
-        <a href="{{ route('subscriptions.index') }}" class="link">← Cancel</a>
+        
+        <div style="text-align: center; margin-top: 20px;">
+            <a href="{{ route('subscriptions.index') }}" class="link">← Cancel and go back</a>
+        </div>
     </div>
 </body>
 </html>
